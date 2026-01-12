@@ -1,0 +1,53 @@
+{
+  "name": "@vector-games/game-core",
+  "version": "1.0.0",
+  "description": "Core game platform services for bet, wallet, and auth management",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "prepublishOnly": "npm run build",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [
+    "vector-games",
+    "bet",
+    "wallet",
+    "auth",
+    "nestjs"
+  ],
+  "author": "",
+  "license": "MIT",
+  "peerDependencies": {
+    "@nestjs/common": "^11.0.0",
+    "@nestjs/core": "^11.0.0",
+    "@nestjs/typeorm": "^11.0.0",
+    "@nestjs/jwt": "^11.0.0",
+    "@nestjs/axios": "^3.1.0",
+    "@nestjs/config": "^3.0.0",
+    "typeorm": "^0.3.26",
+    "rxjs": "^7.8.0",
+    "reflect-metadata": "^0.2.2",
+    "express": "^4.18.0"
+  },
+  "dependencies": {
+    "class-validator": "^0.14.2",
+    "class-transformer": "^0.5.1",
+    "uuid": "^9.0.0"
+  },
+  "devDependencies": {
+    "@nestjs/common": "^11.0.1",
+    "@nestjs/core": "^11.0.1",
+    "@nestjs/typeorm": "^11.0.0",
+    "@nestjs/jwt": "^11.0.0",
+    "@nestjs/axios": "^3.1.0",
+    "@nestjs/config": "^3.0.0",
+    "@types/node": "^22.10.7",
+    "@types/uuid": "^9.0.0",
+    "@types/express": "^4.17.21",
+    "typescript": "^5.7.3",
+    "typeorm": "^0.3.26",
+    "rxjs": "^7.8.1",
+    "reflect-metadata": "^0.2.2"
+  }
+}
