@@ -7,6 +7,7 @@ export class JwtTokenModule {
   static forRoot(config: JwtTokenServiceConfig): DynamicModule {
     return {
       module: JwtTokenModule,
+      global: true, // Make module global so JwtTokenService is available everywhere
       imports: [JwtModule.register({})],
       providers: [
         {

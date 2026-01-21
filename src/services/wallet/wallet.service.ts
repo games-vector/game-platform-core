@@ -81,7 +81,14 @@ export class WalletService {
     @Optional()
     @Inject(WALLET_API_ADAPTER)
     private readonly walletApiAdapter?: WalletApiAdapter,
-  ) {}
+  ) {
+    // Diagnostic logging to verify adapter injection
+    if (this.walletApiAdapter) {
+      this.logger.log('[WalletService] WalletApiAdapter is available and injected');
+    } else {
+      this.logger.warn('[WalletService] WalletApiAdapter is NOT available - game payloads will be minimal');
+    }
+  }
 
   private async resolveAgent(agentId: string) {
     const agent = await this.agentsService.findOne(agentId);
@@ -308,35 +315,75 @@ export class WalletService {
 
   async placeBet(params: PlaceBetParams): Promise<WalletResponse> {
     const requestId = uuidv4();
-    const { callbackURL, cert } = await this.resolveAgent(params.agentId);
-    const url = callbackURL;
-    const betTime = new Date().toISOString();
-    const currency = params.currency || 'USD';
-
-    // Get game payloads from adapter if available
-    const gamePayloads = this.walletApiAdapter
-      ? await this.walletApiAdapter.getGamePayloads(params.gameCode)
-      : { gameCode: params.gameCode };
-
-    const txn = {
-      platformTxId: params.platformTxId,
-      userId: params.userId,
-      currency,
-      ...gamePayloads,
-      betType: null,
-      betAmount: params.amount,
-      betTime,
-      roundId: params.roundId,
-      isPremium: false,
-    };
-
-    const messageObj = { action: 'bet', txns: [txn] };
-    const payload = { key: cert, message: JSON.stringify(messageObj) };
-    const requestStartTime = Date.now();
-    this.logger.debug(
-      `[WALLET_API_REQUEST] user=${params.userId} agent=${params.agentId} action=placeBet url=${url} amount=${params.amount} roundId=${params.roundId} txId=${params.platformTxId} requestId=${requestId}`,
+    let requestStartTime: number | undefined;
+    let url: string | undefined;
+    let messageObj: any;
+    let currency: string = params.currency || 'USD';
+    
+    this.logger.log(
+      `[WALLET_PLACE_BET_START] requestId=${requestId} user=${params.userId} agent=${params.agentId} gameCode=${params.gameCode} amount=${params.amount} roundId=${params.roundId} txId=${params.platformTxId}`,
     );
+
     try {
+      const { callbackURL, cert } = await this.resolveAgent(params.agentId);
+      url = callbackURL;
+      const betTime = new Date().toISOString();
+      currency = params.currency || 'USD';
+
+      this.logger.debug(
+        `[WALLET_PLACE_BET] Resolved agent: agentId=${params.agentId} url=${url} currency=${currency}`,
+      );
+
+      // Get game payloads from adapter if available
+      // Wrap in try-catch to handle errors gracefully (e.g., game not found in DB)
+      let gamePayloads: { gameCode: string; [key: string]: any } = { gameCode: params.gameCode };
+      if (this.walletApiAdapter) {
+        this.logger.debug(
+          `[WALLET_PLACE_BET] WalletApiAdapter available, fetching game payloads for gameCode=${params.gameCode}`,
+        );
+        try {
+          gamePayloads = await this.walletApiAdapter.getGamePayloads(params.gameCode);
+          this.logger.log(
+            `[WALLET_PLACE_BET] Successfully fetched game payloads: gameCode=${params.gameCode} payloads=${JSON.stringify(gamePayloads)}`,
+          );
+        } catch (error) {
+          // Log error but continue with minimal payload
+          const errorMessage = error instanceof Error ? error.message : String(error);
+          const errorStack = error instanceof Error ? error.stack : undefined;
+          this.logger.error(
+            `[WALLET_PLACE_BET] Failed to get game payloads for gameCode=${params.gameCode}, using minimal payload. Error: ${errorMessage}${errorStack ? ` Stack: ${errorStack}` : ''}`,
+          );
+          // Fall back to minimal payload (already set above)
+        }
+      } else {
+        this.logger.warn(
+          `[WALLET_PLACE_BET] WalletApiAdapter not available, using minimal payload for gameCode=${params.gameCode}`,
+        );
+      }
+
+      const txn = {
+        platformTxId: params.platformTxId,
+        userId: params.userId,
+        currency,
+        ...gamePayloads,
+        betType: null,
+        betAmount: params.amount,
+        betTime,
+        roundId: params.roundId,
+        isPremium: false,
+      };
+
+      this.logger.debug(
+        `[WALLET_PLACE_BET] Transaction object: ${JSON.stringify(txn, null, 2)}`,
+      );
+
+      messageObj = { action: 'bet', txns: [txn] };
+      const payload = { key: cert, message: JSON.stringify(messageObj) };
+      requestStartTime = Date.now();
+      this.logger.log(
+        `[WALLET_API_REQUEST] requestId=${requestId} user=${params.userId} agent=${params.agentId} action=placeBet url=${url} amount=${params.amount} roundId=${params.roundId} txId=${params.platformTxId} gamePayloads=${JSON.stringify(gamePayloads)}`,
+      );
+      
       const resp = await firstValueFrom(this.http.post<any>(url, payload));
       const responseTime = Date.now() - requestStartTime;
       const mappedResponse = this.mapAgentResponse((resp as any).data);
@@ -391,12 +438,18 @@ export class WalletService {
         callbackUrl: url,
       });
 
+      this.logger.log(
+        `[WALLET_PLACE_BET_SUCCESS] requestId=${requestId} user=${params.userId} agent=${params.agentId} status=${mappedResponse.status} balance=${mappedResponse.balance}`,
+      );
       return mappedResponse;
     } catch (err: any) {
-      const responseTime = Date.now() - requestStartTime;
+      const responseTime = requestStartTime ? Date.now() - requestStartTime : 0;
+      const errorMessage = err instanceof Error ? err.message : String(err);
+      const errorStack = err instanceof Error ? err.stack : undefined;
+      const errorName = err instanceof Error ? err.name : typeof err;
+      
       this.logger.error(
-        `placeBet failed agent=${params.agentId} user=${params.userId} requestId=${requestId}`,
-        err,
+        `[WALLET_PLACE_BET_ERROR] requestId=${requestId} agent=${params.agentId} user=${params.userId} gameCode=${params.gameCode} amount=${params.amount} roundId=${params.roundId} txId=${params.platformTxId} error=${errorName}: ${errorMessage}${errorStack ? `\nStack: ${errorStack}` : ''}${err.response ? `\nHTTP Status: ${err.response.status}\nResponse Data: ${JSON.stringify(err.response.data)}` : ''}${err.code ? `\nError Code: ${err.code}` : ''}`,
       );
 
       // Determine error type
@@ -421,7 +474,7 @@ export class WalletService {
         userId: params.userId,
         apiAction: WalletApiAction.PLACE_BET,
         status: WalletAuditStatus.FAILURE,
-        requestPayload: { messageObj, url },
+        requestPayload: messageObj ? { messageObj, url } : undefined,
         requestUrl: url,
         responseData,
         httpStatus,
@@ -448,9 +501,19 @@ export class WalletService {
     const txTime = new Date().toISOString();
 
     // Get game payloads from adapter if available
-    const gamePayloads = this.walletApiAdapter
-      ? await this.walletApiAdapter.getGamePayloads(params.gameCode)
-      : { gameCode: params.gameCode };
+    // Wrap in try-catch to handle errors gracefully (e.g., game not found in DB)
+    let gamePayloads: { gameCode: string; [key: string]: any } = { gameCode: params.gameCode };
+    if (this.walletApiAdapter) {
+      try {
+        gamePayloads = await this.walletApiAdapter.getGamePayloads(params.gameCode);
+      } catch (error) {
+        // Log error but continue with minimal payload
+        this.logger.warn(
+          `Failed to get game payloads for gameCode=${params.gameCode}, using minimal payload. Error: ${error instanceof Error ? error.message : String(error)}`,
+        );
+        // Fall back to minimal payload (already set above)
+      }
+    }
 
     const txn: any = {
       platformTxId: params.platformTxId,
@@ -561,9 +624,19 @@ export class WalletService {
       return mappedResponse;
     } catch (err: any) {
       const responseTime = Date.now() - requestStartTime;
-      const gamePayloads = this.walletApiAdapter
-        ? await this.walletApiAdapter.getGamePayloads(params.gameCode)
-        : { gameCode: params.gameCode };
+      // Get game payloads from adapter if available (with error handling)
+      let gamePayloads: { gameCode: string; currency?: string; [key: string]: any } = { gameCode: params.gameCode };
+      if (this.walletApiAdapter) {
+        try {
+          gamePayloads = await this.walletApiAdapter.getGamePayloads(params.gameCode);
+        } catch (error) {
+          // Log error but continue with minimal payload
+          this.logger.warn(
+            `Failed to get game payloads for gameCode=${params.gameCode}, using minimal payload. Error: ${error instanceof Error ? error.message : String(error)}`,
+          );
+          // Fall back to minimal payload (already set above)
+        }
+      }
       const currency = gamePayloads.currency || 'USD';
 
       // Determine error type
@@ -643,9 +716,19 @@ export class WalletService {
     const gameCode = firstTransaction?.gameCode || '';
 
     // Get game payloads from adapter if available
-    const gamePayloads = this.walletApiAdapter && gameCode
-      ? await this.walletApiAdapter.getGamePayloads(gameCode)
-      : { gameCode };
+    // Wrap in try-catch to handle errors gracefully (e.g., game not found in DB)
+    let gamePayloads: { gameCode: string; currency?: string; [key: string]: any } = { gameCode };
+    if (this.walletApiAdapter && gameCode) {
+      try {
+        gamePayloads = await this.walletApiAdapter.getGamePayloads(gameCode);
+      } catch (error) {
+        // Log error but continue with minimal payload
+        this.logger.warn(
+          `Failed to get game payloads for gameCode=${gameCode}, using minimal payload. Error: ${error instanceof Error ? error.message : String(error)}`,
+        );
+        // Fall back to minimal payload (already set above)
+      }
+    }
 
     const currency = gamePayloads.currency || 'USD';
 

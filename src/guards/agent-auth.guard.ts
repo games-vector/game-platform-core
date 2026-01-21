@@ -58,7 +58,7 @@ export class AgentAuthGuard implements CanActivate {
     }
 
     const { agentId, cert, gameCode } = this.extractCredentials(req);
-    const clientIp = await this.extractClientIp(req, gameCode);
+    const clientIp = await this.extractClientIp(req, gameCode || '');
 
     await this.validateAgent(agentId, cert, clientIp);
 
@@ -70,13 +70,13 @@ export class AgentAuthGuard implements CanActivate {
     return this.configService.get<boolean>('app.enableAuth') !== false;
   }
 
-  private extractCredentials(req: Request): { agentId: string; cert: string; gameCode: string } {
+  private extractCredentials(req: Request): { agentId: string; cert: string; gameCode?: string } {
     const body: any = req.body || {};
     const agentId: string | undefined = body.agentId;
     const cert: string | undefined = body.cert;
     const gameCode: string | undefined = body.gameCode;
 
-    if (!agentId || !cert || !gameCode) {
+    if (!agentId || !cert) {
       this.logger.warn('Authentication attempt with missing credentials');
       throw new UnauthorizedException(ERROR_MESSAGES.MISSING_CREDENTIALS);
     }
@@ -84,7 +84,7 @@ export class AgentAuthGuard implements CanActivate {
     return { agentId, cert, gameCode };
   }
 
-  private async extractClientIp(req: Request, gameCode: string): Promise<string> {
+  private async extractClientIp(req: Request, gameCode?: string): Promise<string> {
     const headerIp = await this.extractIpFromHeader(req, gameCode);
     const rawIp =
       headerIp || req.ip || (req.socket && req.socket.remoteAddress) || '';
@@ -161,8 +161,8 @@ export class AgentAuthGuard implements CanActivate {
     return false;
   }
 
-  private async extractIpFromHeader(req: Request, gameCode: string): Promise<string | undefined> {
-    const configuredHeader = await this.getConfiguredIpHeader(gameCode);
+  private async extractIpFromHeader(req: Request, gameCode?: string): Promise<string | undefined> {
+    const configuredHeader = gameCode ? await this.getConfiguredIpHeader(gameCode) : undefined;
 
     if (configuredHeader) {
       const value = req.headers[configuredHeader.toLowerCase()];
