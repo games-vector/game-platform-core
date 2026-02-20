@@ -24,7 +24,6 @@ export {
   CreateBetParams,
   SettlementParams,
   UpdateBetStatusParams,
-  UpdateBetParams,
 } from './services/bet/bet.service';
 export {
   WalletService,

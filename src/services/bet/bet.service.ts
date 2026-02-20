@@ -12,35 +12,29 @@ import { Bet } from '../../entities/bet.entity';
 import { BetStatus } from '../../enums/bet-status.enum';
 import { GameValidationService } from '../../interfaces/game-validation.interface';
 
-/**
- * Comprehensive interface for creating a bet with all Bet entity columns
- * All fields except id, createdAt, updatedAt can be provided
- */
 export interface CreateBetParams {
-  // Required fields
   externalPlatformTxId: string;
   userId: string;
   roundId: string;
-  betAmount: string;
-  currency: string;
-  gameCode: string;
-  createdBy: string;
-  operatorId: string;
-
-  // Optional fields - all Bet entity columns
   gameMetadata?: {
     difficulty?: string;
     betType?: string;
     [key: string]: any; // Allow any game-specific fields
   };
+  betAmount: string;
+  currency: string;
+  gameCode: string;
+  isPremium?: boolean;
+  betPlacedAt?: Date;
+  balanceAfterBet?: string;
+  createdBy: string;
+  operatorId: string;
+  // Additional Bet entity columns that can be set during creation
   winAmount?: string;
   status?: BetStatus;
   settlementRefTxId?: string;
-  isPremium?: boolean;
-  betPlacedAt?: Date;
   settledAt?: Date;
   gameInfo?: string;
-  balanceAfterBet?: string;
   balanceAfterSettlement?: string;
   updatedBy?: string;
   finalCoeff?: string;
@@ -54,94 +48,36 @@ export interface CreateBetParams {
   };
 }
 
-/**
- * Comprehensive interface for settling a bet with all Bet entity columns
- * All fields can be updated during settlement
- */
 export interface SettlementParams {
   externalPlatformTxId: string;
   winAmount: string;
+  settleType?: string;
+  settlementRefTxId?: string;
+  settledAt?: Date;
+  balanceAfterSettlement?: string;
+  gameInfo?: string;
   updatedBy: string;
-
-  // All other Bet entity columns that can be updated during settlement
+  finalCoeff?: string;
+  withdrawCoeff?: string;
+  fairnessData?: {
+    decimal?: string;
+    clientSeed?: string;
+    serverSeed?: string;
+    combinedHash?: string;
+    hashedServerSeed?: string;
+  };
+  // Additional Bet entity columns that can be updated during settlement
   gameMetadata?: {
     difficulty?: string;
     betType?: string;
     [key: string]: any; // Allow any game-specific fields
   };
-  settlementRefTxId?: string;
-  settledAt?: Date;
-  balanceAfterSettlement?: string;
-  gameInfo?: string;
-  finalCoeff?: string;
-  withdrawCoeff?: string;
-  fairnessData?: {
-    decimal?: string;
-    clientSeed?: string;
-    serverSeed?: string;
-    combinedHash?: string;
-    hashedServerSeed?: string;
-  };
-  status?: BetStatus; // Allow overriding status if needed
-  // Additional fields that might need updating during settlement
-  userId?: string;
-  roundId?: string;
-  betAmount?: string;
-  currency?: string;
-  gameCode?: string;
-  isPremium?: boolean;
-  betPlacedAt?: Date;
-  balanceAfterBet?: string;
-  operatorId?: string;
 }
 
-/**
- * Interface for updating bet status
- */
 export interface UpdateBetStatusParams {
   externalPlatformTxId: string;
   status: BetStatus;
   updatedBy: string;
-}
-
-/**
- * Comprehensive interface for updating any Bet entity column
- * All fields except id, createdAt, updatedAt can be updated
- */
-export interface UpdateBetParams {
-  externalPlatformTxId: string;
-  updatedBy: string;
-
-  // All updatable Bet entity columns
-  userId?: string;
-  roundId?: string;
-  gameMetadata?: {
-    difficulty?: string;
-    betType?: string;
-    [key: string]: any;
-  };
-  betAmount?: string;
-  winAmount?: string;
-  currency?: string;
-  status?: BetStatus;
-  settlementRefTxId?: string;
-  isPremium?: boolean;
-  betPlacedAt?: Date;
-  settledAt?: Date;
-  gameCode?: string;
-  gameInfo?: string;
-  balanceAfterBet?: string;
-  balanceAfterSettlement?: string;
-  operatorId?: string;
-  finalCoeff?: string;
-  withdrawCoeff?: string;
-  fairnessData?: {
-    decimal?: string;
-    clientSeed?: string;
-    serverSeed?: string;
-    combinedHash?: string;
-    hashedServerSeed?: string;
-  };
 }
 
 const ERROR_MESSAGES = {
@@ -189,8 +125,6 @@ export class BetService {
       );
       throw new ConflictException(ERROR_MESSAGES.BET_EXISTS);
     }
-    
-    // Create entity with all provided fields
     const entity = this.repo.create({
       externalPlatformTxId: params.externalPlatformTxId,
       userId: params.userId,
@@ -199,18 +133,18 @@ export class BetService {
       betAmount: params.betAmount,
       currency: params.currency,
       gameCode: params.gameCode,
-      operatorId: params.operatorId,
-      createdBy: params.createdBy,
-      updatedBy: params.updatedBy ?? params.createdBy,
-      // Optional fields
-      winAmount: params.winAmount,
-      status: params.status ?? BetStatus.PLACED,
-      settlementRefTxId: params.settlementRefTxId,
       isPremium: params.isPremium,
       betPlacedAt: params.betPlacedAt,
+      balanceAfterBet: params.balanceAfterBet,
+      status: params.status ?? BetStatus.PLACED,
+      createdBy: params.createdBy,
+      updatedBy: params.updatedBy ?? params.createdBy,
+      operatorId: params.operatorId,
+      // Additional optional fields
+      winAmount: params.winAmount,
+      settlementRefTxId: params.settlementRefTxId,
       settledAt: params.settledAt,
       gameInfo: params.gameInfo,
-      balanceAfterBet: params.balanceAfterBet,
       balanceAfterSettlement: params.balanceAfterSettlement,
       finalCoeff: params.finalCoeff,
       withdrawCoeff: params.withdrawCoeff,
@@ -242,76 +176,27 @@ export class BetService {
       return bet; // Return existing settled bet to prevent double settlement
     }
 
-    // Update all provided fields
     bet.winAmount = params.winAmount;
-    bet.updatedBy = params.updatedBy;
+    bet.settlementRefTxId = params.settlementRefTxId;
+    bet.settledAt = params.settledAt ?? new Date();
+    bet.balanceAfterSettlement = params.balanceAfterSettlement;
+    bet.gameInfo = params.gameInfo;
+    bet.finalCoeff = params.finalCoeff;
+    bet.withdrawCoeff = params.withdrawCoeff;
+    bet.fairnessData = params.fairnessData;
     
-    // Update optional fields if provided
+    // Update gameMetadata if provided
     if (params.gameMetadata !== undefined) {
       bet.gameMetadata = params.gameMetadata;
     }
-    if (params.settlementRefTxId !== undefined) {
-      bet.settlementRefTxId = params.settlementRefTxId;
-    }
-    if (params.settledAt !== undefined) {
-      bet.settledAt = params.settledAt;
-    } else {
-      bet.settledAt = new Date();
-    }
-    if (params.balanceAfterSettlement !== undefined) {
-      bet.balanceAfterSettlement = params.balanceAfterSettlement;
-    }
-    if (params.gameInfo !== undefined) {
-      bet.gameInfo = params.gameInfo;
-    }
-    if (params.finalCoeff !== undefined) {
-      bet.finalCoeff = params.finalCoeff;
-    }
-    if (params.withdrawCoeff !== undefined) {
-      bet.withdrawCoeff = params.withdrawCoeff;
-    }
-    if (params.fairnessData !== undefined) {
-      bet.fairnessData = params.fairnessData;
-    }
-    
-    // Update additional fields if provided
-    if (params.userId !== undefined) {
-      bet.userId = params.userId;
-    }
-    if (params.roundId !== undefined) {
-      bet.roundId = params.roundId;
-    }
-    if (params.betAmount !== undefined) {
-      bet.betAmount = params.betAmount;
-    }
-    if (params.currency !== undefined) {
-      bet.currency = params.currency;
-    }
-    if (params.gameCode !== undefined) {
-      bet.gameCode = params.gameCode;
-    }
-    if (params.isPremium !== undefined) {
-      bet.isPremium = params.isPremium;
-    }
-    if (params.betPlacedAt !== undefined) {
-      bet.betPlacedAt = params.betPlacedAt;
-    }
-    if (params.balanceAfterBet !== undefined) {
-      bet.balanceAfterBet = params.balanceAfterBet;
-    }
-    if (params.operatorId !== undefined) {
-      bet.operatorId = params.operatorId;
-    }
 
-    // Determine status: use provided status or auto-determine based on winAmount
-    if (params.status !== undefined) {
-      bet.status = params.status;
-    } else if (bet.winAmount && Number(bet.winAmount) > 0) {
+    if (bet.winAmount && Number(bet.winAmount) > 0) {
       bet.status = BetStatus.WON;
     } else {
       bet.status = BetStatus.LOST;
     }
 
+    bet.updatedBy = params.updatedBy;
     const settled = await this.repo.save(bet);
     this.logger.log(
       `Bet settled: ${params.externalPlatformTxId} (status: ${bet.status}, win: ${params.winAmount})`,
@@ -332,90 +217,6 @@ export class BetService {
     bet.status = params.status;
     bet.updatedBy = params.updatedBy;
     return this.repo.save(bet);
-  }
-
-  /**
-   * Comprehensive update method that allows updating any Bet entity column
-   * @param params - Update parameters with externalPlatformTxId, updatedBy, and any fields to update
-   * @returns Updated Bet entity
-   */
-  async updateBet(params: UpdateBetParams): Promise<Bet> {
-    const bet = await this.repo.findOne({
-      where: this.whereByExternalTx(params.externalPlatformTxId),
-    });
-    if (!bet) {
-      this.logger.warn(
-        `Bet update failed: bet not found (${params.externalPlatformTxId})`,
-      );
-      throw new NotFoundException(ERROR_MESSAGES.BET_NOT_FOUND);
-    }
-
-    // Update all provided fields
-    bet.updatedBy = params.updatedBy;
-
-    if (params.userId !== undefined) {
-      bet.userId = params.userId;
-    }
-    if (params.roundId !== undefined) {
-      bet.roundId = params.roundId;
-    }
-    if (params.gameMetadata !== undefined) {
-      bet.gameMetadata = params.gameMetadata;
-    }
-    if (params.betAmount !== undefined) {
-      bet.betAmount = params.betAmount;
-    }
-    if (params.winAmount !== undefined) {
-      bet.winAmount = params.winAmount;
-    }
-    if (params.currency !== undefined) {
-      bet.currency = params.currency;
-    }
-    if (params.status !== undefined) {
-      bet.status = params.status;
-    }
-    if (params.settlementRefTxId !== undefined) {
-      bet.settlementRefTxId = params.settlementRefTxId;
-    }
-    if (params.isPremium !== undefined) {
-      bet.isPremium = params.isPremium;
-    }
-    if (params.betPlacedAt !== undefined) {
-      bet.betPlacedAt = params.betPlacedAt;
-    }
-    if (params.settledAt !== undefined) {
-      bet.settledAt = params.settledAt;
-    }
-    if (params.gameCode !== undefined) {
-      bet.gameCode = params.gameCode;
-    }
-    if (params.gameInfo !== undefined) {
-      bet.gameInfo = params.gameInfo;
-    }
-    if (params.balanceAfterBet !== undefined) {
-      bet.balanceAfterBet = params.balanceAfterBet;
-    }
-    if (params.balanceAfterSettlement !== undefined) {
-      bet.balanceAfterSettlement = params.balanceAfterSettlement;
-    }
-    if (params.operatorId !== undefined) {
-      bet.operatorId = params.operatorId;
-    }
-    if (params.finalCoeff !== undefined) {
-      bet.finalCoeff = params.finalCoeff;
-    }
-    if (params.withdrawCoeff !== undefined) {
-      bet.withdrawCoeff = params.withdrawCoeff;
-    }
-    if (params.fairnessData !== undefined) {
-      bet.fairnessData = params.fairnessData;
-    }
-
-    const updated = await this.repo.save(bet);
-    this.logger.log(
-      `Bet updated: ${params.externalPlatformTxId}`,
-    );
-    return updated;
   }
 
   async markPendingSettlement(
