@@ -1,12 +1,20 @@
 {
-  "name": "@vector-games/game-core",
-  "version": "1.0.0",
+  "name": "@games-vector/game-core",
+  "version": "1.0.1",
   "description": "Core game platform services for bet, wallet, and auth management",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
+  "publishConfig": {
+    "registry": "https://npm.pkg.github.com"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/games-vector/game-platform-core.git"
+  },
   "scripts": {
     "build": "tsc",
     "prepublishOnly": "npm run build",
+    "publish:github": "npm publish --registry=https://npm.pkg.github.com",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [

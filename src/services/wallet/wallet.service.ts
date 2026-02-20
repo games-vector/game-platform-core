@@ -221,10 +221,17 @@ export class WalletService {
     const url = callbackURL;
     const messageObj = { action: 'getBalance', userId };
     const payload = { key: cert, message: JSON.stringify(messageObj) };
+    const formData = new URLSearchParams();
+    formData.append('key', cert);
+    formData.append('message', JSON.stringify(messageObj));
     const requestStartTime = Date.now();
     this.logger.debug(`Calling getBalance url=${url} agent=${agentId} requestId=${requestId}`);
     try {
-      const resp = await firstValueFrom(this.http.post<any>(url, payload));
+      const resp = await firstValueFrom(
+        this.http.post<any>(url, formData.toString(), {
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        }),
+      );
       const responseTime = Date.now() - requestStartTime;
       const mappedResponse = this.mapAgentResponse((resp as any).data);
 
@@ -379,12 +386,19 @@ export class WalletService {
 
       messageObj = { action: 'bet', txns: [txn] };
       const payload = { key: cert, message: JSON.stringify(messageObj) };
+      const formData = new URLSearchParams();
+      formData.append('key', cert);
+      formData.append('message', JSON.stringify(messageObj));
       requestStartTime = Date.now();
       this.logger.log(
         `[WALLET_API_REQUEST] requestId=${requestId} user=${params.userId} agent=${params.agentId} action=placeBet url=${url} amount=${params.amount} roundId=${params.roundId} txId=${params.platformTxId} gamePayloads=${JSON.stringify(gamePayloads)}`,
       );
       
-      const resp = await firstValueFrom(this.http.post<any>(url, payload));
+      const resp = await firstValueFrom(
+        this.http.post<any>(url, formData.toString(), {
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        }),
+      );
       const responseTime = Date.now() - requestStartTime;
       const mappedResponse = this.mapAgentResponse((resp as any).data);
       this.logger.log(
@@ -537,12 +551,19 @@ export class WalletService {
     }
     const messageObj = { action: 'settle', txns: [txn] };
     const payload = { key: cert, message: JSON.stringify(messageObj) };
+    const formData = new URLSearchParams();
+    formData.append('key', cert);
+    formData.append('message', JSON.stringify(messageObj));
     const requestStartTime = Date.now();
     this.logger.debug(
       `[WALLET_API_REQUEST] user=${params.userId} agent=${params.agentId} action=settleBet url=${url} txId=${params.platformTxId} betAmount=${params.betAmount} winAmount=${params.winAmount} roundId=${params.roundId} requestId=${requestId}`,
     );
     try {
-      const resp = await firstValueFrom(this.http.post<any>(url, payload));
+      const resp = await firstValueFrom(
+        this.http.post<any>(url, formData.toString(), {
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        }),
+      );
       const responseTime = Date.now() - requestStartTime;
       const mappedResponse = this.mapAgentResponse((resp as any).data);
       this.logger.log(
@@ -763,13 +784,20 @@ export class WalletService {
 
     const messageObj = { action: 'cancelBet', txns };
     const payload = { key: cert, message: JSON.stringify(messageObj) };
+    const formData = new URLSearchParams();
+    formData.append('key', cert);
+    formData.append('message', JSON.stringify(messageObj));
     const requestStartTime = Date.now();
     const txIds = txns.map(t => t.platformTxId).join(',');
     this.logger.debug(
       `[WALLET_API_REQUEST] user=${params.userId} agent=${params.agentId} action=refundBet url=${url} txCount=${txns.length} txIds=[${txIds}] requestId=${requestId}`,
     );
     try {
-      const resp = await firstValueFrom(this.http.post<any>(url, payload));
+      const resp = await firstValueFrom(
+        this.http.post<any>(url, formData.toString(), {
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        }),
+      );
       const responseTime = Date.now() - requestStartTime;
       const mappedResponse = this.mapAgentResponse((resp as any).data);
       this.logger.log(
