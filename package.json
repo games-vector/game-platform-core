@@ -1,6 +1,6 @@
 {
   "name": "@games-vector/game-core",
-  "version": "1.0.3",
+  "version": "1.0.4",
   "description": "Core game platform services for bet, wallet, and auth management",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
